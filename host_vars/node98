@@ -1,8 +1,0 @@
----
-ansible_host: '192.168.0.98'
-netdev:
-  - 'ens192'
-
-# openstack-ansible
-osa_host_id: 12
-node_id: 191098

@@ -1,10 +1,24 @@
-[all]
+all:
+  hosts:
+    node95:
+      ansible_host: '192.168.0.95'
+      node_id: 191095
+    node96:
+      ansible_host: '192.168.0.96'
+      node_id: 191096
+    node97:
+      ansible_host: '192.168.0.97'
+      node_id: 191097
+    node98:
+      ansible_host: '192.168.0.98'
+      node_id: 191098
+  children:
+    nodes:
+      hosts:
+        node95:
+        node96:
+        node97:
+        node98:
 
-
-[nodes]
-node95
-node96
-node97
-node98
 
 
