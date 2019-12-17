@@ -1,17 +1,19 @@
 all:
+  vars:
+    ansible_user: 'root'
   hosts:
     node95:
       ansible_host: '192.168.0.95'
-      node_id: 191095
+      node_id: 95
     node96:
       ansible_host: '192.168.0.96'
-      node_id: 191096
+      node_id: 96
     node97:
       ansible_host: '192.168.0.97'
-      node_id: 191097
+      node_id: 97
     node98:
       ansible_host: '192.168.0.98'
-      node_id: 191098
+      node_id: 98
   children:
     nodes:
       hosts:

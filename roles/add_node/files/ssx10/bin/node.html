@@ -1,0 +1,1101 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">	
+    <title>支付密码测试平台服务（多节点版本）</title>
+<style>
+     .wrap{
+      box-sizing: content-box;
+      border:2px dashed red;
+      overflow: auto;/* 父元素清除浮动*/
+     }
+     .left{
+        float:left;
+        box-sizing: border-box;
+        width:300px;
+        background: teal;
+     }
+     .right{
+        float:left;
+        box-sizing: border-box;
+        width:calc(100% - 300px);
+        background: #FFFFEE;
+     }
+    </style>
+
+  </head>
+
+<body>
+  <div class="left">
+  支付密码器地址: <input type="text" style="height:20px;width:245px;font color=blue;" id="vpcmd_ws_addr" size = "28" name="vpcmd_ws_addr" " value="ws://192.168.0.98:5223"/>
+  <input type="submit" value="连接" onclick="vpcmd()" />
+  <br />
+  核验服务器地址: <input type="text" style="height:20px;width:245px;font color=blue;" id="vverifyd_ws_addr" size = "28" name="vverifyd_ws_addr" " value="ws://192.168.0.99:5224"/>
+  <input type="submit" value="连接" onclick="vverifyd()" />
+  <hr>
+    测试功能：<select style="height:20px;width:245px;font color=blue;" name="type" id="func" >
+      <option value='获取机具信息'>获取机具信息</option>
+      <option value='机具注册'>机具注册</option>
+      <option value='机具解锁'>机具解锁</option>
+      <option value='机具注销'>机具注销</option>
+      <option value='增加账号'>增加账号</option>
+      <option value='删除账号'>删除账号</option>
+      <option value='增发账号'>增发账号</option>
+      <option value='批量增加账号'>批量增加账号</option>
+      <option value='计算支付密码'>只计算支付密码</option>
+      <option value='核验支付密码'>只核验支付密码</option>
+      <option value='计算&核验'>计算且核验密码</option>
+
+      <input type="submit" value="确认" onclick="doMain()" />
+    </select>
+    <br />
+    <br />机具信息：
+    <br />客户 GID：<input type="text" id="gid" name="gid" " size = "30" value="123" placeholder="请输入GID"/>
+    <br />机具编号：<input type="text" id="gMachinesn" name="gMachinesn" size = "30" " placeholder="请输入机具编号"/>
+    <br />票据信息：
+    <br />账　　号：<input type="text" id="gAccount" name="gAccount" " size = "30" list="accounts" placeholder="请输入账号"/>
+    <datalist id="accounts"></datalist>
+    <br />票据类型：<input type="text" id="gType" name="gType" " size = "30" list="types" placeholder="请选择票据类型"/>
+    <datalist id="types">
+    	<option value='1'>支票</option>
+    	<option value='2'>银行汇票申请书</option>
+    	<option value='3'>银行本票申请书</option>
+    	<option value='4'>汇兑凭证</option>
+    	<option value='5'>其它</option>
+    </datalist>
+    <br />票据号码：<input type="text" id="gNumber" name="gNumber" " size = "30" placeholder="请输入票据号码"/>
+    <br />开票日期：<input type="date" id="gDate" name="gDate" " size = "30" placeholder="请输入票据日期" />
+    <br />开票金额：<input type="text" id="gMoney" name="gMoney" " size = "30" placeholder="请输入开票金额"/>
+    <br />支付密码：<input type="text" id="gPaymentcode" name="gPaymentcode" " size = "30" placeholder="支付密码"/>
+    <br />核验签名：<input type="text" id="gSig" name="gSig" size = "30" " disabled="disabled" placeholder="核验签名"/>
+    <hr>
+    循环次数：<input type="text" id="gCount" name="gCount" size = "30" placeholder="请输入计算的次数"/>
+    <br />缓冲大小：<input type="text" " id="gSndMaxWaitCount"  size = "30" name="gSndMaxWaitCount"/>
+    <br />提交次数：<input type="text" " disabled="disabled" id="gSndCount" size = "30" name="gSndCount"/>
+    <br />失败次数：<input type="text" " disabled="disabled" id="gDoErrCount" size = "30" name="gDoErrCount"/>
+    <br />完成次数：<input type="text" " disabled="disabled" id="gDoCount" size = "30" name="gDoCount"/>
+    <br />总计耗时：<input type="text" " disabled="disabled" id="gTimeCount" size = "30" name="gTimeCount"/>
+    <br />单次耗时：<input type="text" " disabled="disabled" id="gSpeed" size = "30" name="gSpeed"/>
+    <br />tps 值  ：<input type="text" " disabled="disabled" id="gTps" size = "30" name="gTps"/>
+
+  </div>
+  <div class="right">
+    支付密码服务器状态：
+    <div id="vpcmdMessage" style="font-size:12px;overflow:auto; height:300px;border-style:inset;"></div>
+    核验服务器状态：
+    <div id="vverifydMessage" style="font-size:12px;overflow:auto;height:300px;border-style:inset"></div>
+    状态：
+    <div id="messages" style="font-size:12px;overflow:auto;height:100px;border-style:inset"></div>
+    <font color=black overflow:auto >	</font>
+ </div>
+  <script type="text/javascript">
+  
+  //Designed By C.S.Xiao, E-mail:securesms@gmail.com, TEL:13700232986 2018-8-30
+
+
+
+  var maxWaitCount = 1;//默认不允许挂起
+
+  var vmaxWaitCount = 1;//默认不允许挂起
+	
+	var sndMaxWaitCount = 1;//允许挂起的最大交易数
+    
+  var appendFlag = false;
+
+  var autoAddAccountFlag = false;//批量增加账号标志
+
+  var verifyPaymentCodeFlag = false;
+  var calcPaymentCodeFlag = false;
+
+  var gCount = 1000;
+  var sndCount; 
+  var doCount;
+  var doErrCount;//超时失败的计数
+
+  var tmpVk;
+  var tmpChipid;
+
+  var sendToVverifyd;
+  var sendToVverifydAgain;
+
+  var sendToVpcmd;
+  var sendToVpcmdAgain;
+
+  var flashVpcmdMsgFlag = false;
+  var flashVverifydMsgFlag = false;
+
+  var curTS = 1;
+
+  var timestamp = new Date().getTime();
+
+  document.getElementById("gCount").value = gCount;//for test.
+
+document.getElementById('messages').style.height = (document.documentElement.clientHeight - 700) + 'px';
+
+	setTimeout("MyAutoRun()",500);
+
+	function MyAutoRun() {
+    curTS++;
+    //每隔2秒，进行一次是否有超时包的检查
+    if((curTS%4) == 0)
+    {
+      wsPackageTestAndTry(wsPPackage,sendToVpcmdAgain);
+      wsPackageTestAndTry(wsVPackage,sendToVverifyd);
+//      document.getElementById('messages').style.Height = document.documentElement.clientHeight - 640;
+
+    }
+    else
+    {
+      if(flashVpcmdMsgFlag) {
+          flashVpcmdMsgFlag = false;
+          document.getElementById('vpcmdMessage').scrollTop = document.getElementById('vpcmdMessage').scrollHeight;
+      }
+
+      if(flashVverifydMsgFlag) {
+        flashVverifydMsgFlag = false;
+        document.getElementById('vverifydMessage').scrollTop = document.getElementById('vverifydMessage').scrollHeight;
+      }
+    }
+    setTimeout("MyAutoRun()",500);
+	}
+
+  //WS通信和服务并不可靠，因此此处需要对超时没有返回的数据包进行重发处理
+  //思路：重发5次如果失败则返回处理失败。
+  //构造一个数组，每个数据：存储JSON对象，时间戳，重发计数和SID（SID不从JSON中获取，这样可以加快处理速度）
+  //发送的时候，先从数组中获取一个空闲的位置，把发送的JSON数据存入
+  //接收的时候，从数组中获取该SID，如果没有找到则丢弃，如果找到，则返回，同时把该数据的时间戳设置为０
+  //定时器每隔大约2秒检查一次时间戳，是否有超时未收到返回的，如果有则重发，如果超过重发次数，返回处理错误。
+
+  //新思路：利用SID，SID规则：以秒为单位的发送时间，后面跟4位序号。
+  //SID ： 时间（秒） + 4位序号。
+  //SID相同　：　忽略最后一位相同，则SID相同，比较的时候也可把SID除以10后在比较。
+  //超时失败判断：当前时间比SID的时间大4秒，则交易失败
+  //重发： 只重发一次，当前时间比SID的时间大2秒，则重发
+  wsPPackage = new Array();
+  wsVPackage = new Array();
+
+  //改变缓冲包的数量
+  //注意：本函数直接从最后删除数组，不考虑该数组的数据是否有效
+  function wsPackageChangeSize(package,newCount) {
+    var defPack = new Object();
+    defPack["SID"] = 0;
+    if(package.length < newCount)
+    {
+      var addCount = newCount - package.length;
+      while(addCount--)
+        package.push(defPack);
+      return;
+    }
+    if(package.length > newCount)
+    {
+      var eraseCount = package.length - newCount;
+      while(eraseCount--)
+        package.pop();
+    }
+  }
+
+  //缓冲包超时检查和处理
+  function wsPackageTestAndTry(package,sndFunc) {
+    if(package.length == 0)return;
+
+    var now = new Date().getTime();
+    now = parseInt((now)/1000)%100000;
+    now *= 10000;
+    
+    for(var i in package) {
+      var pTime = package[i].SID;
+      if(pTime == 0)continue;
+      var retryNumber = package[i].RETRYNUMBER;
+      var retryCount = package[i].RETRYCOUNT;
+
+      if(now < pTime) {
+        if((pTime - now) > 20000*retryCount) {
+          //time out.
+          package[i].SID = 0;//放弃这个数据包
+          doErrCount++;
+          document.getElementById("gDoErrCount").value = doErrCount;
+          var str = JSON.stringify(package[i]);
+          document.getElementById('messages').innerHTML += '<font color=red>' + str + '</font><br />'
+          continue;
+        }
+
+        if(pTime - now > 20000*retryNumber) {
+          retryNumber++;
+          package[i].RETRYNUMBER = retryNumber;
+          //send again.
+          sndFunc(package[i]);
+        }
+      }
+      else {
+        if(now - pTime > 20000*retryCount) {
+          //time out.
+          doErrCount++;
+          document.getElementById("gDoErrCount").value = doErrCount;
+          var str = JSON.stringify(package[i]);
+          document.getElementById('messages').innerHTML += '<font color=red>' + str + '</font><br />'
+          package[i].SID = 0;//放弃这个数据包
+          continue;
+        }
+        if(now - pTime > 20000*retryNumber) {
+          retryNumber++;
+          package[i].RETRYNUMBER = retryNumber;
+           //send again.
+          sndFunc(package[i]);
+        }
+      }
+    }
+  }
+
+  //发送新包，如果成功，则返回true；否则返回false.
+  function wsPackageAdd(package,data,retryCount,sndFunc) {
+    for(var i in package) {
+      if(package[i].SID == 0) {
+        package[i] = data;
+        package[i].SID = sndFunc(package[i]);
+        //因为重试信息只有客户端自己使用，因此/默认发送的第一个包，不包含重试信息
+        //后面发送的，可以剔除，也可以不管直接再发送
+        package[i].RETRYNUMBER = 1;
+        package[i].RETRYCOUNT = retryCount;
+        
+        return true;
+      }
+    }
+    return false;
+  }
+
+  //从数组中删除指定sid的包
+  function wsPackageErase(package,sid) {
+    for(var i in package) {
+      if(package[i].SID == sid) {        
+        package[i].SID = 0;
+        return package[i];
+      }
+    }
+    return null;
+  }
+
+  function wsPackageGetVaildCount(package){
+    var vaildCount = 0;
+    for(var i in package) {
+      if(package[i].SID != 0)vaildCount++;
+    }
+    return vaildCount;
+  }
+
+  function wsPackageHasFree(package){
+    for(var i in package) {
+      if(package[i].SID == 0)return true;
+    }
+    return false;
+  }
+
+  wsPackageChangeSize(wsPPackage,sndMaxWaitCount+20);//initial.
+  wsPackageChangeSize(wsVPackage,sndMaxWaitCount+20);//initial.
+
+
+  function find(str,cha,num) 
+  {
+    var x=str.indexOf(cha);
+    for(var i=0;i<num;i++) {
+      x=str.indexOf(cha,x+1);
+    }
+    return x;
+  }
+
+  function dispVpcmdMsg(str,color) {
+  	var div = document.getElementById('vpcmdMessage');
+    var len = div.innerHTML.length;
+  	if(len > 20000) {
+      var text = div.innerHTML; 
+      var idx = find(text,'<br>',50);
+      if(idx > 0 && idx + 4 < len) div.innerHTML = text.substring(idx+4,len);  
+    }
+    
+    div.innerHTML += '<font color=' + color + '>' + str + '</font><br />';
+   
+    flashVpcmdMsgFlag = true;
+  }
+
+  function dispVverifydMsg(str,color) {
+   	var div = document.getElementById('vverifydMessage');
+    var len = div.innerHTML.length;
+    if(len > 20000) 
+    {
+      var text = div.innerHTML; 
+      var idx = find(text,'<br>',50);
+      if(idx > 0 && idx + 4 < len)
+      {
+        div.innerHTML = text.substring(idx+4,len);  
+      }
+    }
+
+    div.innerHTML += '<font color=' + color + '>' + str + '<br />';
+    	
+    flashVverifydMsgFlag = true;
+  }
+
+  function onOpen(event) {
+    document.getElementById('messages').innerHTML += '<font color=orange> Connection established</font><br />';
+  }
+    
+  function onClose(event) {
+    document.getElementById('messages').innerHTML += '<font color=orange> disconnection</font><br />';
+  }
+  
+  function onError(event) {
+    alert(event.data);
+  }
+  
+  function vpcmd()
+  {
+    timestamp = new Date().getTime();
+
+    var curSidSec;//默认SID的时间，如果不同的时候，curSidCount = 0;单位秒
+    var curSidCount;//默认的SID序号，如果SID相同，curSidCount+=1;
+
+    function getNewSid() {
+      //set new SID.
+      var sidSec= new Date().getTime();
+      sidSec = parseInt(sidSec/1000)%100000;//服务器端可能只支持32位整数。
+      if(curSidSec != sidSec) {
+        curSidSec = sidSec;
+        curSidCount = 1001;
+      }
+      else {
+        curSidCount++;
+      }
+      return sidSec*10000 + curSidCount;
+    }
+
+    var webSocket = new WebSocket(document.getElementById("vpcmd_ws_addr").value);
+	  
+	  webSocket.onerror = function(event) {
+	    onError(event)
+	  };
+	 
+	  webSocket.onopen = function(event) {
+	    onOpen(event)
+	  };
+	    
+	  webSocket.onclose = function(event) {
+	    onClose(event)
+	  };
+	 
+	  webSocket.onmessage = function(event) {
+	    onMessage(event)
+	  };
+
+    sendToVpcmd = function(snd) {
+    	snd["REQ"] = "c2s";
+
+      snd["SID"] = getNewSid();
+
+    	var str = JSON.stringify(snd);
+//      if(snd.ACTION != "CALC_PAYMENTCODE")
+     	dispVpcmdMsg(str,'green');
+
+	    webSocket.send(str);	
+
+      return snd["SID"];
+    }
+
+    sendToVpcmdAgain = function(snd) {
+      var str = JSON.stringify(snd);
+
+//      if(snd.ACTION != "CALC_PAYMENTCODE")
+      dispVpcmdMsg(str,'blue');
+
+      webSocket.send(str);  
+    }
+  }
+
+  function onMessage(event) {
+	var acc;
+    var res =  JSON.parse(event.data);
+
+    tt = new Date().getTime() - timestamp;
+    document.getElementById("gTimeCount").value = (tt/1000).toFixed(3) + "秒";
+
+    if(res.ERROR_MESSAGE) {
+      dispVpcmdMsg(event.data,'red');
+      return;
+    }
+    else {
+//      if(res.ACTION != "CALC_PAYMENTCODE")
+        dispVpcmdMsg(event.data,'purple');
+    }
+
+    switch(res.ACTION) {
+      case "SET_MAXWAITCOUNT":
+        maxWaitCount = res.MAXWAITCOUNT;
+        if(maxWaitCount > parseInt(2000/tt))maxWaitCount = parseInt(2000/tt);
+        sndMaxWaitCount = (maxWaitCount > vmaxWaitCount) ? vmaxWaitCount : maxWaitCount;
+
+        wsPackageChangeSize(wsPPackage,sndMaxWaitCount+20);//initial.
+        wsPackageChangeSize(wsVPackage,sndMaxWaitCount+20);//initial.
+
+        document.getElementById("gSndMaxWaitCount").value = sndMaxWaitCount;      
+        break;
+
+      case "GET_MACHINESN":
+        document.getElementById("gMachinesn").value = res.MACHINESN;
+        getAccounts();
+        if(!(res.MAXWAITCOUNT))break;
+        
+      case "CREATE_SKVK":
+        if(appendFlag) {
+          tmpChipid = res.CHIPID;
+          tmpVk = res.VK;
+          alert("请更换签名密码器");
+          appendSig(res.CHIPID,res.VK);
+          break;
+        }
+        if(!autoAddAccountFlag)
+        {
+          vcreateAkz(res.CHIPID,res.VK);
+          break;
+        }
+        
+        var ct = wsPackageErase(wsPPackage,res["SID"]);
+        if(ct == null) break;
+
+        var snd = new Object();
+        snd["ACTION"] = "CREATE_AKZ";
+        snd["MACHINESN"] = res.MACHINESN;
+        snd["ACCOUNT"] = res.ACCOUNT;
+        snd["CHIPID"] = res.CHIPID;
+        snd["VK"] = res.VK;
+        sendToVverifyd(snd);
+        break;
+      case "APPEND_SIG":
+        alert("请换回增发密码器");
+        vcreateAppendAkz(tmpChipid,tmpVk,res.ASIG);
+        appendFlag = false;
+        break;
+      case "CALC_PAYMENTCODE":
+        var checkv = new Object();
+        checkv = res.CHECKV;
+        document.getElementById("gPaymentcode").value = checkv.PAYMENTCODE;
+
+        var ct = wsPackageErase(wsPPackage,res["SID"]);
+        if(ct == null) break;
+        var check = new Object();
+        check = ct.CHECK;
+        if(checkv["ACCOUNT"] != check["ACCOUNT"] ||
+          checkv["TYPE"] != check["TYPE"] ||
+          checkv["DATE"] != check["DATE"] ||
+          checkv["NUMBER"] != check["NUMBER"] ||
+          checkv["MONEY"] != check["MONEY"])
+        {
+          var snd = new Object();
+          snd["ACTION"] = "CALC_PAYMENTCODE";
+          snd["MACHINESN"] = ct["MACHINESN"];
+          snd["CHECK"] = check;
+          
+          var cs = JSON.stringify(snd);
+          dispVpcmdMsg(cs,'pink');
+          
+          if(wsPackageAdd(wsPPackage,snd,6,sendToVpcmd)) {
+            sndCount++;
+            document.getElementById("gSndCount").value = sndCount;
+          }
+          break;
+        }
+
+        var c = {};
+        for(var i in ct)c[i] = ct[i];
+        c.SID = res.SID;
+        delete c.RETRYCOUNT;
+        delete c.RETRYNUMBER;
+        var cs = JSON.stringify(c);
+//        dispVpcmdMsg(cs,'green');
+//        dispVpcmdMsg(event.data,'purple');
+
+        if(verifyPaymentCodeFlag) {
+          verifyPaymentcodeMain(checkv);          
+        }
+        else {
+          doCount++;
+          document.getElementById("gDoCount").value = doCount;
+          document.getElementById("gSpeed").value = (tt/doCount).toFixed(3) + "毫秒";
+        document.getElementById("gTps").value = (doCount*1000/tt).toFixed(2);
+
+          calcPaymentcodeRand();
+        }
+        break;
+      case "ISSUE_MACHINE":
+      case "ERASE_ACCOUNT":
+        getAccounts();
+        break;
+      case "DOWNLOAD_AKZ":
+        if(autoAddAccountFlag)
+        {
+          var ct = wsPackageErase(wsPPackage,res["SID"]);
+          if(ct == null) break;
+      	  doCount++;
+	      document.getElementById("gDoCount").value = doCount;
+	      document.getElementById("gSpeed").value = (tt/doCount).toFixed(3) + "毫秒";
+	      document.getElementById("gTps").value = (doCount*1000/tt).toFixed(2);
+	      
+          autoCreateSKVK();
+      	}
+      	else
+      		getAccounts();
+      	break;
+      case "GET_ACCOUNTS":
+        var accArray = document.getElementById( "accounts").options;
+        var aL = accArray.length;
+       while(aL > 0 ) {
+          aL--;
+          document.getElementById( "accounts").removeChild(accArray[aL]);
+        }
+        accArray = res.ACCOUNT;
+        aL = accArray.length;
+        while(aL > 0) {
+          aL--;
+          var opt = document.createElement('option');
+          opt.value = accArray[aL].replace(/\b(0+)/gi,"");
+          document.getElementById( "accounts").appendChild(opt);
+        }
+        break;
+      default:
+        break;
+    }
+  }
+
+  function vverifyd() {
+    timestamp = new Date().getTime();
+
+    var curSidSec;//默认SID的时间，如果不同的时候，curSidCount = 0;单位秒
+    var curSidCount;//默认的SID序号，如果SID相同，curSidCount+=1;
+
+    function getNewSid() {
+      //set new SID.
+      var sidSec= new Date().getTime();
+      sidSec = parseInt(sidSec/1000)%100000;//服务器端可能只支持32位整数。
+      if(curSidSec != sidSec) {
+        curSidSec = sidSec;
+        curSidCount = 1;
+      }
+      else {
+        curSidCount++;
+      }
+      return sidSec*10000 + curSidCount;
+   }
+
+    var webSocket = new WebSocket(document.getElementById("vverifyd_ws_addr").value);
+
+    webSocket.onerror = function(event) {
+      onError(event)
+    };
+ 
+    webSocket.onopen = function(event) {
+      onOpen(event)
+    };
+    
+    webSocket.onclose = function(event) {
+      onClose(event)
+    };
+ 
+    webSocket.onmessage = function(event) {
+      vonMessage(event)
+    };
+
+    sendToVverifyd = function(snd) {
+      snd["REQ"] = "c2s";
+      snd["SID"] = getNewSid();
+      var str = JSON.stringify(snd);
+//      if(snd.ACTION != "VERIFY_PAYMENTCODE")
+        dispVverifydMsg(str,'auqamarin');
+
+      webSocket.send(str);
+      return snd["SID"];
+    }
+
+    sendToVverifydAgain = function(snd) {
+      var str = JSON.stringify(snd);
+//      if(snd.ACTION != "VERIFY_PAYMENTCODE")
+        dispVverifydMsg(str,'blue');
+
+      webSocket.send(str);  
+    }
+
+  }
+
+  function vonMessage(event) {
+    var res =  JSON.parse(event.data);
+    tt = new Date().getTime() - timestamp;
+    document.getElementById("gTimeCount").value = (tt/1000).toFixed(3) + "秒";
+
+    if(res.ERROR_MESSAGE) {
+  	  dispVverifydMsg(event.data,'red');
+      return;
+    }
+    else {
+//      if(res.ACTION != "VERIFY_PAYMENTCODE")
+        dispVverifydMsg(event.data,'navy');
+    }
+
+    switch(res.ACTION) {
+      case "SET_MAXWAITCOUNT":
+        vmaxWaitCount = res.MAXWAITCOUNT;
+        if(vmaxWaitCount > parseInt(2000/tt))vmaxWaitCount = parseInt(2000/tt);
+
+        sndMaxWaitCount = (maxWaitCount > vmaxWaitCount) ? vmaxWaitCount : maxWaitCount;
+        
+        wsPackageChangeSize(wsPPackage,sndMaxWaitCount+20);//initial.
+        wsPackageChangeSize(wsVPackage,sndMaxWaitCount+20);//initial.
+
+        document.getElementById("gSndMaxWaitCount").value = sndMaxWaitCount;
+        break;
+      case "ISSUE_MACHINE":
+        issueMachine(res.UNLOCKVAL);
+        break;
+      case "GET_UNLOCKVAL":
+        unlockMachine(res.UNLOCKVAL);
+        break;
+      case "CREATE_AKZ":
+
+        if(!autoAddAccountFlag)
+        {
+          downloadAkz(res.AKZ,res.KEYNUM);
+          break;
+        } 
+
+        var snd = new Object();
+        snd["ACTION"] = "DOWNLOAD_AKZ";
+        snd["MACHINESN"] = res.MACHINESN;
+        snd["ACCOUNT"] = res.ACCOUNT;
+        snd["AKZ"] = res.AKZ;
+        snd["KEYNUM"] = res.KEYNUM;
+        wsPackageAdd(wsPPackage,snd,3,sendToVpcmd);
+
+        break;
+      case "CREATE_APPENDAKZ":
+        downloadAkz(res.AKZ,res.KEYNUM);
+        break;
+      case "VERIFY_PAYMENTCODE":
+        var vt = wsPackageErase(wsVPackage,res["SID"]);
+        if(vt == null) break;
+        var v = {};
+        for(var i in vt)v[i] = vt[i];
+        v.SID = res.SID;
+        delete v.RETRYCOUNT;
+        delete v.RETRYNUMBER;
+        var vs = JSON.stringify(v);
+
+        doCount++;
+        document.getElementById("gDoCount").value = doCount;
+        document.getElementById("gSpeed").value = (tt/doCount).toFixed(3) + "毫秒";
+        document.getElementById("gTps").value = (doCount*1000/tt).toFixed(2);
+        
+        checks = res.CHECKS;
+        document.getElementById("gSig").value = checks["SIG"];
+        if(gCount > doCount) {
+          if(calcPaymentCodeFlag)	calcPaymentcodeRand();
+          else verifyPaymentcodeMore();
+        }
+        break;
+      case "ERASE_ACCOUNT":
+        break;
+      default:
+        break;
+    }
+  }
+  
+  function getCheckDate() {
+	  return document.getElementById("gDate").value.replace(/-/g,'');
+  }
+
+	function setDate(d) {
+		document.getElementById("gDate").value = d.getFullYear().toString() + "-" +  ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2);
+	}
+
+  function doMain() {
+
+    document.getElementById('messages').innerHTML = '';
+    document.getElementById('vpcmdMessage').innerHTML = '';
+    document.getElementById('vverifydMessage').innerHTML = '';
+
+	  sndMaxWaitCount = document.getElementById("gSndMaxWaitCount").value;
+
+    wsPackageChangeSize(wsPPackage,sndMaxWaitCount+20);//initial.
+    wsPackageChangeSize(wsVPackage,sndMaxWaitCount+20);//initial.
+
+    timestamp = new Date().getTime();
+    switch(document.getElementById("func").value) {
+      case '获取机具信息':
+        if(document.getElementById("gid").value.length == 0
+           && document.getElementById("vpcmd_ws_addr").value != "ws://127.0.0.1:5223") {
+          alert("GID不能为空！");
+          return;
+        }
+        getMachineSN();
+        break;
+      case '机具注册':
+        if(document.getElementById("gMachinesn").value.length != 10) {
+          alert("机具编号无效！");
+          return;
+        }
+        vissueMachine();
+        break;
+      case '机具解锁':
+        if(document.getElementById("gMachinesn").value.length != 10) {
+          alert("机具编号无效！");
+          return;
+        }
+        vunlockMachine();
+        break;
+      case '机具注销':
+        if(document.getElementById("gMachinesn").value.length != 10) {
+          alert("机具编号无效！");
+          return;
+        }
+        veraseMachine();
+        break;
+      case '增加账号':
+        if(document.getElementById("gAccount").value.length == 0) {
+          alert("账号不能为空！");
+          return;
+        }
+        appendFlag = false;
+        autoAddAccountFlag = false;
+        createSKVK();
+        break;
+      case '删除账号':
+        if(document.getElementById("gAccount").value.length == 0) {
+          alert("账号不能为空！");
+          return;
+        }
+        eraseAccount();
+        veraseAccount();
+        break;
+      case '增发账号':
+        if(document.getElementById("gAccount").value.length == 0) {
+          alert("账号不能为空！");
+          return;
+        }
+        appendFlag = true;
+        autoAddAccountFlag = false;        
+        createSKVK();
+        break;
+      case '批量增加账号':
+        gCount = document.getElementById("gCount").value;
+        if(document.getElementById("gAccount").value.length == 0) {
+          alert("账号不能为空！");
+          return;
+        }
+        appendFlag = false;
+        autoAddAccountFlag = true;
+        doCount = 0;
+        doErrCount = 0;
+        document.getElementById("gDoErrCount").value = doErrCount;
+        sndCount = 0;
+        if(gCount > 1)
+          autoCreateSKVK();
+        else
+          createSKVK();
+        break;
+      case '计算支付密码':
+        calcPaymentCodeFlag = true;
+        verifyPaymentCodeFlag = false;
+        gCount = document.getElementById("gCount").value;
+        doCount = 0;
+        doErrCount = 0;
+        document.getElementById("gDoErrCount").value = doErrCount;
+
+        sndCount = 0;
+        if(gCount > 1)
+        	calcPaymentcodeRand();	
+        else
+        	calcPaymentcode();
+        break;
+      case '核验支付密码':
+        calcPaymentCodeFlag = false;
+        verifyPaymentCodeFlag = true;
+        gCount = document.getElementById("gCount").value;
+        doCount = 0;
+        doErrCount = 0;
+        document.getElementById("gDoErrCount").value = doErrCount;
+        sndCount = 0;
+        verifyPaymentcode();
+        break;
+      case '计算&核验':
+        calcPaymentCodeFlag = true;
+        verifyPaymentCodeFlag = true;
+        gCount = document.getElementById("gCount").value;
+        doCount = 0;
+        doErrCount = 0;
+        document.getElementById("gDoErrCount").value = doErrCount;
+        sndCount = 0;
+        if(gCount > 1)
+        	calcPaymentcodeRand();	
+        else
+        	calcPaymentcode();
+        break;
+      default:
+        break;
+    }
+  }
+
+  function getMachineSN() {  
+    var snd = new Object();
+    snd["ACTION"] = "GET_MACHINESN";
+    snd["GID"] = document.getElementById("gid").value;
+    sendToVpcmd(snd);
+  }
+
+  function getAccounts() {
+    var snd = new Object();
+    snd["ACTION"] = "GET_ACCOUNTS";
+    snd["MACHINESN"] = document.getElementById("gMachinesn").value ;
+    sendToVpcmd(snd);
+  }
+
+  function vissueMachine() {
+    var snd = new Object();
+    snd["ACTION"] = "ISSUE_MACHINE";
+    snd["MACHINESN"] = document.getElementById("gMachinesn").value ;
+    sendToVverifyd(snd);
+  }
+
+  function issueMachine(unlockval) {
+    var snd = new Object();
+    snd["ACTION"] = "ISSUE_MACHINE";
+    snd["MACHINESN"] = document.getElementById("gMachinesn").value ;
+    snd["UNLOCKVAL"] = unlockval;
+    sendToVpcmd(snd);
+  }
+
+  function vunlockMachine() {
+    var snd = new Object();
+    snd["ACTION"] = "GET_UNLOCKVAL";
+    snd["MACHINESN"] = document.getElementById("gMachinesn").value ;
+    sendToVverifyd(snd);
+  }
+ 
+  function unlockMachine(unlockval) {
+    var snd = new Object();
+    snd["ACTION"] = "UNLOCK_MACHINE";
+    snd["MACHINESN"] = document.getElementById("gMachinesn").value ;
+    snd["UNLOCKVAL"] = unlockval;
+    sendToVpcmd(snd);
+  }
+ 
+  function veraseMachine() {
+    var snd = new Object();
+    snd["ACTION"] = "ERASE_MACHINE";
+    snd["MACHINESN"] = document.getElementById("gMachinesn").value ;
+    sendToVverifyd(snd);
+  }
+
+  function createSKVK() {
+    var snd = new Object();
+    snd["ACTION"] = "CREATE_SKVK";
+    snd["MACHINESN"] = document.getElementById("gMachinesn").value ;
+    snd["ACCOUNT"] = document.getElementById("gAccount").value;
+    sendToVpcmd(snd);
+  }
+
+  function autoCreateSKVK(){
+    while(true)
+    {
+      if(sndMaxWaitCount <= (sndCount - doCount - doErrCount)/2) return;
+      if(gCount <= sndCount - doErrCount) return;
+      if(!wsPackageHasFree(wsPPackage))return;
+
+      acc = parseInt(document.getElementById("gAccount").value) + 1;
+      document.getElementById("gAccount").value = acc.toString();         
+
+      var snd = new Object();
+      snd["ACTION"] = "CREATE_SKVK";
+      snd["MACHINESN"] = document.getElementById("gMachinesn").value ;
+      snd["ACCOUNT"] = document.getElementById("gAccount").value;
+     
+      if(!wsPackageAdd(wsPPackage,snd,3,sendToVpcmd))return;
+
+      sndCount++;
+      document.getElementById("gSndCount").value = sndCount;
+    }
+  } 
+
+  function vcreateAkz(chipid,vk) {
+    var snd = new Object();
+    snd["ACTION"] = "CREATE_AKZ";
+    snd["MACHINESN"] = document.getElementById("gMachinesn").value ;
+    snd["ACCOUNT"] = document.getElementById("gAccount").value;
+    snd["CHIPID"] = chipid;
+    snd["VK"] = vk;
+    sendToVverifyd(snd);
+  }
+ 
+  function downloadAkz(akz,keynum) {
+    var snd = new Object();
+    snd["ACTION"] = "DOWNLOAD_AKZ";
+    snd["MACHINESN"] = document.getElementById("gMachinesn").value ;
+    snd["ACCOUNT"] = document.getElementById("gAccount").value;
+    snd["AKZ"] = akz;
+    snd["KEYNUM"] = keynum;
+    sendToVpcmd(snd);
+  }
+
+  function eraseAccount() {
+    var snd = new Object();
+    snd["ACTION"] = "ERASE_ACCOUNT";
+    snd["MACHINESN"] = document.getElementById("gMachinesn").value ;
+    snd["ACCOUNT"] = document.getElementById("gAccount").value;
+    sendToVpcmd(snd);
+  }
+
+  function veraseAccount() {
+    var snd = new Object();
+    snd["ACTION"] = "ERASE_ACCOUNT";
+    snd["MACHINESN"] = document.getElementById("gMachinesn").value ;
+    snd["ACCOUNT"] = document.getElementById("gAccount").value;
+    sendToVverifyd(snd);
+  }
+
+  function appendSig(newchipid,newvk) {
+    var snd = new Object();
+    snd["ACTION"] = "APPEND_SIG";
+    snd["MACHINESN"] = document.getElementById("gMachinesn").value ;
+    snd["ACCOUNT"] = document.getElementById("gAccount").value;
+    snd["NEWCHIPID"] = newchipid;
+    snd["NEWVK"] = newvk;
+    sendToVpcmd(snd);
+  }
+
+  function vcreateAppendAkz(chipid,vk,asig) {
+    var snd = new Object();
+    snd["ACTION"] = "CREATE_APPENDAKZ";
+    snd["MACHINESN"] = document.getElementById("gMachinesn").value ;
+    snd["ACCOUNT"] = document.getElementById("gAccount").value;
+    snd["CHIPID"] = chipid;
+    snd["VK"] = vk;
+    snd["ASIG"] = asig;
+    sendToVverifyd(snd);
+  }
+
+  function calcPaymentcode() {
+    var check = new Object();
+    var snd = new Object();
+    //account,type,number,date,money必须有效
+    if(document.getElementById("gAccount").value.length == 0 ||
+      document.getElementById("gNumber").value.length != 8 ||
+      document.getElementById("gType").value.length != 1 ||
+      document.getElementById("gMoney").value.length == 0 ||
+      getCheckDate().length != 8 ) {
+      alert("账号、票据类型、票据号码、开票日期和金额必须有效！");
+      return;
+    }
+
+    check["ACCOUNT"] = document.getElementById("gAccount").value;
+    check["TYPE"] = document.getElementById("gType").value;
+    check["DATE"] = getCheckDate();
+    check["NUMBER"] = document.getElementById("gNumber").value;
+    check["MONEY"] = document.getElementById("gMoney").value;
+
+    snd["ACTION"] = "CALC_PAYMENTCODE";
+    snd["MACHINESN"] = document.getElementById("gMachinesn").value ;
+    snd["CHECK"] = check;
+
+//    sndCount++;
+//    document.getElementById("gSndCount").value = sndCount;
+//    sendToVpcmd(snd);
+    if(wsPackageAdd(wsPPackage,snd,6,sendToVpcmd)) {
+      sndCount++;
+      document.getElementById("gSndCount").value = sndCount;
+      calcPaymentcodeRand();      
+    }
+  }
+
+  function calcPaymentcodeRand() {
+    if(sndMaxWaitCount <= sndCount - doCount - doErrCount) return;
+    if(gCount <= sndCount - doErrCount) return;
+
+    if(!wsPackageHasFree(wsPPackage))return;
+
+    //设置随机的值
+    //new money. 为了模拟实际的情形，需要设置不同位数的金额
+    var moneyLen = Math.floor(Math.random()*15)+1;
+    var money = Math.floor(Math.random()*1000000000000000);
+    //new date.
+    var ndate = new Date();
+    ndate.setDate(ndate.getDate() + Math.floor(Math.random()*10000));
+    //new type.
+    var type = Math.floor(Math.random()*10)%5 + 1;
+    //new number.
+    var number = Math.floor(Math.random()*100000000);
+    //new account. 默认每个密码器的账号小于100
+    var accNo = Math.floor(Math.random()*100)%(document.getElementById( "accounts").options.length);
+	  document.getElementById("gAccount").value = document.getElementById( "accounts").options[accNo].value.toString();
+    document.getElementById("gMoney").value = (Array(moneyLen).join(0) + money).slice(-moneyLen);
+    if(Number(document.getElementById("gMoney").value) == 0)
+      document.getElementById("gMoney").value = "1";
+
+    setDate(ndate);
+    document.getElementById("gNumber").value = (Array(8).join(0) + number).slice(-8);//number.toString();
+    document.getElementById("gType").value = type.toString();
+
+    calcPaymentcode();
+  }
+
+	function verifyPaymentcode() {
+    var snd = new Object();
+    var checkv = new Object();
+    //account,type,number,date,money必须有效
+    if(document.getElementById("gAccount").value.length == 0 ||
+      document.getElementById("gNumber").value.length != 8 ||
+      document.getElementById("gType").value.length != 1 ||
+      document.getElementById("gMoney").value.length == 0 ||
+      getCheckDate().length != 8 ||
+      document.getElementById("gPaymentcode").value.length != 16) {
+      alert("账号、票据类型、票据号码、开票日期、金额和支付密码必须有效！");
+      return;
+    }
+
+    checkv["ACCOUNT"] = document.getElementById("gAccount").value;
+    checkv["TYPE"] = document.getElementById("gType").value;
+    checkv["DATE"] = getCheckDate();//document.getElementById("gDate").value;
+    checkv["NUMBER"] = document.getElementById("gNumber").value;
+    checkv["MONEY"] = document.getElementById("gMoney").value;
+    checkv["PAYMENTCODE"] = document.getElementById("gPaymentcode").value;
+      
+    snd["ACTION"] = "VERIFY_PAYMENTCODE";
+    snd["MACHINESN"] = document.getElementById("gMachinesn").value ;
+    snd["CHECKV"] = checkv;
+
+//    sndCount++;
+//    document.getElementById("gSndCount").value = sndCount;
+//    sendToVverifyd(snd);
+    if(wsPackageAdd(wsVPackage,snd,3,sendToVverifyd))
+    {
+      sndCount++;
+      document.getElementById("gSndCount").value = sndCount;
+      verifyPaymentcodeMore();
+    }
+	}
+
+	function verifyPaymentcodeMore() {
+    if(sndMaxWaitCount <= sndCount - doCount - doErrCount) return;
+    if(gCount <= sndCount - doErrCount) return;
+    if(!wsPackageHasFree(wsVPackage))return;
+    verifyPaymentcode();
+	}
+
+  function verifyPaymentcodeMain(checkv) {
+    var snd = new Object();
+    snd["ACTION"] = "VERIFY_PAYMENTCODE";
+    snd["MACHINESN"] = document.getElementById("gMachinesn").value ;
+    snd["CHECKV"] = checkv;
+//    sendToVverifyd(snd);
+
+    if(!wsPackageAdd(wsVPackage,snd,3,sendToVverifyd)) {
+      //add something...
+    }
+
+  }
+
+  </script>
+</body>
+</html>
