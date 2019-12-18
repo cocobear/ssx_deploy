@@ -1,0 +1,12 @@
+{
+	"screen_name":"/dev/tty",
+	"node_ws":[
+
+    {% for node in groups['nodes'] %}
+            "ws://{{ hostvars[node].ansible_host }}:5226" {{ "," if not loop.last  else "" }}
+    {% endfor %}
+	],
+	"auditpath":"/ssx10/log/",
+	"datapath":"/ssx10/data/",
+	"tmpath":"/tmp/"
+}

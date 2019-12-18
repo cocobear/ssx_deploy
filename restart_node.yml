@@ -1,0 +1,16 @@
+---
+- name: 布署支付密码集群
+  hosts: nodes
+  gather_facts: no
+
+  tasks:
+      - name: "stop server"
+        shell: /ssx10/bin/nvpcmd stop {{ node_id }}
+        ignore_errors: True
+        async: 5
+        poll: 5
+
+      - name: "start server"
+        shell: /ssx10/bin/nvpcmd start {{ node_id }}
+        register: run_log
+      - debug: var=run_log

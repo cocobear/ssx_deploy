@@ -14,6 +14,9 @@ all:
     node98:
       ansible_host: '192.168.0.98'
       node_id: 98
+    node199:
+      ansible_host: '192.168.1.199'
+      node_id: 199
   children:
     nodes:
       hosts:
@@ -21,6 +24,7 @@ all:
         node96:
         node97:
         node98:
+        node199:
 
 
 
