@@ -13,7 +13,4 @@
       - name: "stop server"
         shell: rm -f /ssx10/data/*
 
-      - name: "start server"
-        shell: /ssx10/bin/nvpcmd start {{ node_id }}
-        register: run_log
-      - debug: var=run_log
+

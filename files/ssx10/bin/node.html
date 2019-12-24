@@ -27,7 +27,7 @@
 
 <body>
   <div class="left">
-  支付密码器地址: <input type="text" style="height:20px;width:245px;font color=blue;" id="vpcmd_ws_addr" size = "28" name="vpcmd_ws_addr" " value="ws://192.168.0.98:5223"/>
+  支付密码器地址: <input type="text" style="height:20px;width:245px;font color=blue;" id="vpcmd_ws_addr" size = "28" name="vpcmd_ws_addr" " value="ws://192.168.0.95:5223"/>
   <input type="submit" value="连接" onclick="vpcmd()" />
   <br />
   核验服务器地址: <input type="text" style="height:20px;width:245px;font color=blue;" id="vverifyd_ws_addr" size = "28" name="vverifyd_ws_addr" " value="ws://192.168.0.99:5224"/>
@@ -41,6 +41,7 @@
       <option value='增加账号'>增加账号</option>
       <option value='删除账号'>删除账号</option>
       <option value='增发账号'>增发账号</option>
+      <option value='批量获取机具信息'>批量获取机具信息</option>
       <option value='批量增加账号'>批量增加账号</option>
       <option value='计算支付密码'>只计算支付密码</option>
       <option value='核验支付密码'>只核验支付密码</option>
@@ -103,6 +104,8 @@
   var appendFlag = false;
 
   var autoAddAccountFlag = false;//批量增加账号标志
+  
+  var autoAddMachineSnFlag = false;//批量获取机具信息标志
 
   var verifyPaymentCodeFlag = false;
   var calcPaymentCodeFlag = false;
@@ -438,9 +441,26 @@ document.getElementById('messages').style.height = (document.documentElement.cli
         break;
 
       case "GET_MACHINESN":
+      
         document.getElementById("gMachinesn").value = res.MACHINESN;
-        getAccounts();
-        if(!(res.MAXWAITCOUNT))break;
+        
+        if(autoAddMachineSnFlag)
+        {
+          var ct = wsPackageErase(wsPPackage,res["SID"]);
+          if(ct == null)
+          {
+          	break;
+          }
+      	  doCount++;
+	      document.getElementById("gDoCount").value = doCount;
+	      document.getElementById("gSpeed").value = (tt/doCount).toFixed(3) + "毫秒";
+	      document.getElementById("gTps").value = (doCount*1000/tt).toFixed(2);
+	      
+          autoGetMachineSN();
+      	}
+      	else
+      		getAccounts();
+      	break;
         
       case "CREATE_SKVK":
         if(appendFlag) {
@@ -518,7 +538,7 @@ document.getElementById('messages').style.height = (document.documentElement.cli
           doCount++;
           document.getElementById("gDoCount").value = doCount;
           document.getElementById("gSpeed").value = (tt/doCount).toFixed(3) + "毫秒";
-        document.getElementById("gTps").value = (doCount*1000/tt).toFixed(2);
+          document.getElementById("gTps").value = (doCount*1000/tt).toFixed(2);
 
           calcPaymentcodeRand();
         }
@@ -725,8 +745,7 @@ document.getElementById('messages').style.height = (document.documentElement.cli
     timestamp = new Date().getTime();
     switch(document.getElementById("func").value) {
       case '获取机具信息':
-        if(document.getElementById("gid").value.length == 0
-           && document.getElementById("vpcmd_ws_addr").value != "ws://127.0.0.1:5223") {
+        if(document.getElementById("gid").value.length == 0) {
           alert("GID不能为空！");
           return;
         }
@@ -778,6 +797,23 @@ document.getElementById('messages').style.height = (document.documentElement.cli
         appendFlag = true;
         autoAddAccountFlag = false;        
         createSKVK();
+        break;
+      case '批量获取机具信息':
+        gCount = document.getElementById("gCount").value;
+        if(document.getElementById("gid").value.length == 0) {
+          alert("GID不能为空！");
+          return;
+        }
+
+        autoAddMachineSnFlag = true;
+        doCount = 0;
+        doErrCount = 0;
+        document.getElementById("gDoErrCount").value = doErrCount;
+        sndCount = 0;
+        if(gCount > 1)
+          autoGetMachineSN();
+        else
+          getMachineSN();
         break;
       case '批量增加账号':
         gCount = document.getElementById("gCount").value;
@@ -895,6 +931,33 @@ document.getElementById('messages').style.height = (document.documentElement.cli
     snd["MACHINESN"] = document.getElementById("gMachinesn").value ;
     snd["ACCOUNT"] = document.getElementById("gAccount").value;
     sendToVpcmd(snd);
+  }
+
+  function autoGetMachineSN() {
+    while(true)
+    {
+      if(sndMaxWaitCount <= (sndCount - doCount - doErrCount)) return;
+      if(gCount <= sndCount - doErrCount)
+      {
+      	return;
+      }
+      if(!wsPackageHasFree(wsPPackage))
+      {
+	return;
+      }
+
+      var ngid = parseInt(document.getElementById("gid").value) + 1;
+      document.getElementById("gid").value = ngid.toString();        
+
+      var snd = new Object();
+      snd["ACTION"] = "GET_MACHINESN";
+      snd["GID"] = document.getElementById("gid").value;
+
+      if(!wsPackageAdd(wsPPackage,snd,3,sendToVpcmd))return;
+
+      sndCount++;
+      document.getElementById("gSndCount").value = sndCount;
+    }  
   }
 
   function autoCreateSKVK(){
